@@ -1,0 +1,37 @@
+name: Sunday Natural Deal Checker
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Runs daily at 9:00 AM UTC
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run Scraper
+        run: python script.py
+
+      - name: Send Email if Deal Found
+        if: hashFiles('deal_found.txt') != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{secrets.MAIL_USERNAME}}
+          password: ${{secrets.MAIL_PASSWORD}}
+          subject: "New Sunday Natural Discount Found!"
+          to: your-email@example.com
+          from: Deal Bot
+          body: file://deal_found.txt
