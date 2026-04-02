@@ -1,57 +1,46 @@
 import requests
 from bs4 import BeautifulSoup
 
-# The keywords you care about
-AMINO_KEYWORDS = ["amino", "bcaa", "eaa", "protein", "aminosäuren", "komplex"]
-
-# Target sites
+# Define multiple targets
 TARGETS = [
-    {"name": "Influencer Codes", "url": "https://sunday.couponasion.com/"},
-    {"name": "Official Sale Page", "url": "https://www.sunday.de/sale.html"}
+    {"name": "Coupon Site", "url": "https://sunday.couponasion.com/"},
+    {"name": "Official Sale", "url": "https://www.sunday.de/sale.html"}
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-def check_for_aminos():
-    findings = []
-    
-    for target in TARGETS:
-        try:
-            response = requests.get(target["url"], headers=HEADERS, timeout=15)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # 1. Search for Text/Sale mentions
-            # We look for any text that mentions "Amino" or similar
-            text_elements = soup.find_all(string=lambda t: any(k in t.lower() for k in AMINO_KEYWORDS))
-            
-            for element in text_elements:
-                clean_text = element.strip()
-                if 10 < len(clean_text) < 100: # Filter for readable phrases
-                    findings.append(f"[{target['name']}] Found: {clean_text}")
+def scrape_site(target):
+    try:
+        response = requests.get(target["url"], headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        findings = []
 
-            # 2. Specifically look for Codes on the aggregator site
-            if "couponasion" in target["url"]:
-                # These codes were recently seen working (April 2026)
-                # We extract them if they are near 'Sunday' or 'Amino' keywords
-                codes = soup.find_all(['code', 'span'], class_=lambda x: x and 'code' in x.lower())
-                for c in codes:
-                    code_val = c.get_text().strip()
-                    if 3 < len(code_val) < 12:
-                        findings.append(f"Potential Influencer Code: {code_val}")
+        if "couponasion" in target["url"]:
+            # Looks for things that look like actual codes (usually in bold or spans)
+            codes = soup.find_all(['code', 'span', 'div'], class_=lambda x: x and 'code' in x.lower())
+            for c in codes:
+                code_text = c.get_text().strip()
+                if 3 < len(code_text) < 15: # Filter out noise
+                    findings.append(f"Potential Code: {code_text}")
+        
+        elif "sunday.de" in target["url"]:
+            # Look for percentage discounts on the official page
+            sales = soup.find_all(string=lambda text: "%" in text)
+            for s in sales:
+                if len(s.strip()) < 50: # Avoid long paragraphs
+                    findings.append(f"Official Sale: {s.strip()}")
 
-        except Exception as e:
-            print(f"Error on {target['name']}: {e}")
-            
-    return list(set(findings)) # Remove duplicates
+        return findings
+    except:
+        return []
 
 if __name__ == "__main__":
-    results = check_for_aminos()
+    all_results = []
+    for t in TARGETS:
+        res = scrape_site(t)
+        if res:
+            all_results.append(f"--- {t['name']} ---")
+            all_results.extend(res)
+
     with open("deal_found.txt", "w") as f:
-        if results:
-            f.write("SUNDAY NATURAL AMINO ACID ALERTS:\n\n")
-            f.write("\n".join(results))
-            f.write("\n\nCheck official sets here: https://www.sunday.de/en/amino-acid-mix/")
-        else:
-            f.write("")
+        f.write("\n".join(all_results))
