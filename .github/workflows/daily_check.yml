@@ -32,6 +32,6 @@ jobs:
           username: ${{secrets.MAIL_USERNAME}}
           password: ${{secrets.MAIL_PASSWORD}}
           subject: "New Sunday Natural Discount Found!"
-          to: your-email@example.com
+          to: karin.riklin@gmail.com
           from: Deal Bot
           body: file://deal_found.txt
