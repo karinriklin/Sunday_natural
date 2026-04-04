@@ -1,46 +1,46 @@
 import requests
 from bs4 import BeautifulSoup
 
-# Define multiple targets
-TARGETS = [
-    {"name": "Coupon Site", "url": "https://sunday.couponasion.com/"},
-    {"name": "Official Sale", "url": "https://www.sunday.de/sale.html"}
-]
+# Target: MyDealz search for Sunday Natural
+URL = "https://www.mydealz.de/search?q=sunday%20natural"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
-HEADERS = {"User-Agent": "Mozilla/5.0"}
-
-def scrape_site(target):
+def check_for_deals():
     try:
-        response = requests.get(target["url"], headers=HEADERS, timeout=15)
+        response = requests.get(URL, headers=HEADERS, timeout=15)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        findings = []
-
-        if "couponasion" in target["url"]:
-            # Looks for things that look like actual codes (usually in bold or spans)
-            codes = soup.find_all(['code', 'span', 'div'], class_=lambda x: x and 'code' in x.lower())
-            for c in codes:
-                code_text = c.get_text().strip()
-                if 3 < len(code_text) < 15: # Filter out noise
-                    findings.append(f"Potential Code: {code_text}")
         
-        elif "sunday.de" in target["url"]:
-            # Look for percentage discounts on the official page
-            sales = soup.find_all(string=lambda text: "%" in text)
-            for s in sales:
-                if len(s.strip()) < 50: # Avoid long paragraphs
-                    findings.append(f"Official Sale: {s.strip()}")
-
-        return findings
-    except:
+        # Find all deal title links
+        deals = soup.find_all('a', class_='cept-tt')
+        found_entries = []
+        
+        for deal in deals:
+            title = deal.get_text().strip()
+            # This grabs the actual URL link
+            link = deal.get('href')
+            
+            # Filter for your brand
+            if "sunday natural" in title.lower():
+                # MyDealz links are often relative (starting with /)
+                # We turn them into full clickable links
+                if link and link.startswith('/'):
+                    link = f"https://www.mydealz.de{link}"
+                
+                found_entries.append(f"PROMO: {title}\nCLICK HERE: {link}")
+        
+        return found_entries
+    except Exception as e:
+        print(f"Scraping error: {e}")
         return []
 
 if __name__ == "__main__":
-    all_results = []
-    for t in TARGETS:
-        res = scrape_site(t)
-        if res:
-            all_results.append(f"--- {t['name']} ---")
-            all_results.extend(res)
-
+    results = check_for_deals()
     with open("deal_found.txt", "w") as f:
-        f.write("\n".join(all_results))
+        if results:
+            # This puts a clear line between different deals
+            f.write("\n\n====================\n\n".join(results))
+        else:
+            f.write("") # Leave empty if nothing found
