@@ -13,23 +13,36 @@ def check_for_deals():
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find all deal title links
-        deals = soup.find_all('a', class_='cept-tt')
+        # We look for the main deal "articles" to check status + title
+        # In MyDealz, deals are usually wrapped in an <article> or <div>
+        # but checking the 'thread' class is the most reliable way to find 'expired' markers.
+        threads = soup.find_all('div', class_='thread--deal')
         found_entries = []
         
-        for deal in deals:
-            title = deal.get_text().strip()
-            # This grabs the actual URL link
-            link = deal.get('href')
+        for thread in threads:
+            # 1. Check if the deal is expired
+            # MyDealz adds 'mute--text' or 'is-expired' classes to old deals
+            is_expired = thread.find(class_=lambda x: x and ('is-expired' in x or 'mute--text' in x))
             
-            # Filter for your brand
-            if "sunday natural" in title.lower():
-                # MyDealz links are often relative (starting with /)
-                # We turn them into full clickable links
+            # Get the link/title element
+            link_tag = thread.find('a', class_='cept-tt')
+            if not link_tag:
+                continue
+
+            title = link_tag.get_text().strip().lower()
+            
+            # 2. Filtering Logic: 
+            # - Must contain "sunday natural"
+            # - Must NOT be expired (no 'Abgelaufen' text or expired class)
+            if "sunday natural" in title:
+                if is_expired or "abgelaufen" in thread.get_text().lower() or "expired" in thread.get_text().lower():
+                    continue  # Skip this deal
+                
+                link = link_tag.get('href')
                 if link and link.startswith('/'):
                     link = f"https://www.mydealz.de{link}"
                 
-                found_entries.append(f"PROMO: {title}\nCLICK HERE: {link}")
+                found_entries.append(f"LIVE PROMO: {link_tag.get_text().strip()}\nCLICK HERE: {link}")
         
         return found_entries
     except Exception as e:
@@ -40,7 +53,6 @@ if __name__ == "__main__":
     results = check_for_deals()
     with open("deal_found.txt", "w") as f:
         if results:
-            # This puts a clear line between different deals
             f.write("\n\n====================\n\n".join(results))
         else:
-            f.write("") # Leave empty if nothing found
+            f.write("")
